@@ -27,8 +27,9 @@ pipe = pipeline(
 generation_args = {
     "max_new_tokens": 500,
     "return_full_text": False,
-    "temperature": 0.0,
-    "do_sample": False,
+    "temperature": 0.7,
+    "do_sample": True,
+    "top_p": 0.95,
 }
 
 
@@ -41,17 +42,10 @@ def args_parse():
 
 
 def construct_message(agent_context, instruction, idx):
-    prefix_string = "Here are a list of opinions from different agents: "
 
-    prefix_string = (
-        prefix_string
-        + agent_context
-        + "\n\n Write a summary of the different opinions from each of the individual agent."
-    )
+    message = [{"role": "user", "content": agent_context}]
 
-    message = [{"role": "user", "content": prefix_string}]
-
-    print(f"\nDebug - Input to LLM for summarization:\n{prefix_string}")
+    print(f"\nDebug - Input to LLM for summarization:\n{agent_context}")
     output = pipe(message, **generation_args)
 
     completion = output[0]["generated_text"]
