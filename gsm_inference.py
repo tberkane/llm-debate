@@ -36,6 +36,7 @@ def args_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--round", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
+    parser.add_argument("--evaluation", default=100, type=int)
     return parser.parse_args()
 
 
@@ -122,7 +123,7 @@ if __name__ == "__main__":
     model_list = [f"model_{i}" for i in range(agents)]
     random.seed(0)
 
-    evaluation = 100
+    evaluation = args.evaluation
 
     generated_description = []
 
