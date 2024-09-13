@@ -121,6 +121,8 @@ if __name__ == "__main__":
     questions = read_jsonl("gsm8k_test.jsonl")
     random.shuffle(questions)
 
+    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
+
     for idx in tqdm(range(evaluation)):
         question = questions[idx]["question"]
         answer = questions[idx]["answer"]
@@ -170,10 +172,11 @@ if __name__ == "__main__":
             }
         )
 
-    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
+        # Save results after each evaluation
+        with open(file_name, "w") as f:
+            json.dump(generated_description, f, indent=4)
 
-    print(f"The result file '{file_name}' is saving...")
-    with open(file_name, "w") as f:
-        json.dump(generated_description, f, indent=4)
+        print(f"Results saved after question {idx+1}")
 
+    print(f"The result file '{file_name}' is saved.")
     print("All done!!")
