@@ -14,6 +14,7 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="cuda",
     torch_dtype="auto",
     trust_remote_code=True,
+    attn_implementation="flash_attention_2",
 )
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
