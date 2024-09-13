@@ -88,7 +88,7 @@ if __name__ == "__main__":
                 for i in range(num_agents)
             ]
             gt = response_dict[idx]["answer"]
-
+            print(responses)
             accurate = compute_accuracy(gt, responses)
 
             if accurate is not None:
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         print({f"{turn+1}_performance": np.mean(accuracies)})
 
     print(f"The performance file 'gsm_performance_{file_name}' is saving...")
-    with open(f"gsm_performance_{file_name}", "x") as f:
+    with open(f"gsm_performance_{file_name}", "w") as f:
         json.dump(performance, f, indent=4)
 
     print("All done!!")

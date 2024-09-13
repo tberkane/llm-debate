@@ -45,11 +45,9 @@ def construct_message(agent_context, instruction, idx):
 
     message = [{"role": "user", "content": agent_context}]
 
-    print(f"\nDebug - Input to LLM for summarization:\n{agent_context}")
     output = pipe(message, **generation_args)
 
     completion = output[0]["generated_text"]
-    print(f"\nDebug - LLM summarization output:\n{completion}")
 
     prefix_string = f"Here is a summary of responses from other agents: {completion}"
     prefix_string = (
@@ -101,10 +99,8 @@ if __name__ == "__main__":
 
     def generate_answer(model, formatted_prompt):
         input = [{"role": "user", "content": formatted_prompt}]
-        print(f"\nDebug - Input to LLM for {model}:\n{formatted_prompt}")
         output = pipe(input, **generation_args)
         generated_text = output[0]["generated_text"]
-        print(f"\nDebug - LLM output for {model}:\n{generated_text}")
         return {"model": model, "content": generated_text}
 
     def prompt_formatting(model, instruction):
@@ -129,9 +125,6 @@ if __name__ == "__main__":
         answer = questions[idx]["answer"]
 
         agent_contexts = generate_gsm(model_list, question)
-
-        print(f"\n# Question No.{idx+1} starts...")
-        print(f"Debug - Question: {question}")
 
         message = []
 
