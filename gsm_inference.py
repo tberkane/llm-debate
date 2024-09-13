@@ -179,7 +179,7 @@ if __name__ == "__main__":
     file_name = f"gsm_result_{agents}agents_{rounds}turns.json"
 
     print(f"The result file '{file_name}' is saving...")
-    with open(file_name, "x") as f:
+    with open(file_name, "w") as f:
         json.dump(generated_description, f, indent=4)
 
     print("All done!!")
