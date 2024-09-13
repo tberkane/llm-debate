@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
         # Debate
         for debate in range(rounds + 1):
-            print(f"\nDebug - Debate round: {debate}")
+            # print(f"\nDebug - Debate round: {debate}")
             # Refer to the summarized previous response
             if debate != 0:
                 message.append(
