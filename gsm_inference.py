@@ -170,7 +170,7 @@ if __name__ == "__main__":
             }
         )
 
-    file_name = f"gsm_result_{agents}agents_{rounds}turns.json"
+    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
 
     print(f"The result file '{file_name}' is saving...")
     with open(file_name, "w") as f:
