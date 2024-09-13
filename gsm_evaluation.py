@@ -84,7 +84,8 @@ if __name__ == "__main__":
         accuracies = []
         for idx in range(len(questions)):
             responses = [
-                response_dict[idx]["agent_response"][i][turn] for i in range(num_agents)
+                response_dict[idx]["agent_response"][f"model_{i}"][turn]
+                for i in range(num_agents)
             ]
             gt = response_dict[idx]["answer"]
 
