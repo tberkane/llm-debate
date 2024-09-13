@@ -50,9 +50,11 @@ def construct_message(agent_context, instruction, idx):
 
     message = [{"role": "user", "content": prefix_string}]
 
+    print(f"\nDebug - Input to LLM for summarization:\n{prefix_string}")
     output = pipe(message, **generation_args)
 
     completion = output[0]["generated_text"]
+    print(f"\nDebug - LLM summarization output:\n{completion}")
 
     prefix_string = f"Here is a summary of responses from other agents: {completion}"
     prefix_string = (
@@ -104,9 +106,11 @@ if __name__ == "__main__":
 
     def generate_answer(model, formatted_prompt):
         input = [{"role": "user", "content": formatted_prompt}]
+        print(f"\nDebug - Input to LLM for {model}:\n{formatted_prompt}")
         output = pipe(input, **generation_args)
-
-        return {"model": model, "content": output[0]["generated_text"]}
+        generated_text = output[0]["generated_text"]
+        print(f"\nDebug - LLM output for {model}:\n{generated_text}")
+        return {"model": model, "content": generated_text}
 
     def prompt_formatting(model, instruction):
         prompt = f"User:\n{instruction}\n\nAssistant:\n"
@@ -131,12 +135,14 @@ if __name__ == "__main__":
 
         agent_contexts = generate_gsm(model_list, question)
 
-        print(f"# Question No.{idx+1} starts...")
+        print(f"\n# Question No.{idx+1} starts...")
+        print(f"Debug - Question: {question}")
 
         message = []
 
         # Debate
         for debate in range(rounds + 1):
+            print(f"\nDebug - Debate round: {debate}")
             # Refer to the summarized previous response
             if debate != 0:
                 message.append(
@@ -154,7 +160,7 @@ if __name__ == "__main__":
                 )
                 agent_context.append(completion)
 
-        print(f"# Question No.{idx+1} debate is ended.")
+        print(f"\n# Question No.{idx+1} debate is ended.")
 
         models_response = {
             f"model_{i}": [
