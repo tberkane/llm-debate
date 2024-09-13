@@ -1,5 +1,4 @@
 import json
-import openai
 import numpy as np
 import time
 import re

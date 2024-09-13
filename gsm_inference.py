@@ -1,5 +1,4 @@
 import requests
-import openai
 import json
 import numpy as np
 import random
