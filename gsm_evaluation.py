@@ -7,8 +7,8 @@ import argparse
 
 def args_parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--turns", default=3, type=int)
-    parser.add_argument("--num_agents", default=3, type=int)
+    parser.add_argument("--turns", default=2, type=int)
+    parser.add_argument("--num-agents", default=2, type=int)
 
     return parser.parse_args()
 
