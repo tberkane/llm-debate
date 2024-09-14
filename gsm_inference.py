@@ -28,24 +28,6 @@ def setup_model_and_pipeline():
     return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 
-def format_prompt(question, instruction, previous_response=None, summary=None):
-    prompt = f"""Question: {question}
-
-    Your task is to solve this math problem. Please follow these guidelines:
-    1. Provide a final answer in the format: \\boxed{{your_numerical_answer_here}}
-    2. Ensure that the boxed answer is the last thing in your response.
-
-    {f'Previous response: {previous_response}' if previous_response else ''}
-
-    {f'Summary of other agents thoughts: {summary}' if summary else ''}
-
-    {instruction}
-
-    Your response:
-    """
-    return prompt
-
-
 def generate_text(pipe, input_text, generation_args, debug=False):
     message = [{"role": "user", "content": input_text}]
     if debug:
@@ -57,42 +39,30 @@ def generate_text(pipe, input_text, generation_args, debug=False):
     return generated_text
 
 
-def summarize_responses(pipe, agent_contexts, question, generation_args, debug=False):
-    summary_prompt = (
-        "Here are the responses from different agents to the following question:\n\n"
-    )
-    summary_prompt += f"Question: {question}\n\n"
-    for idx, agent in enumerate(agent_contexts):
-        summary_prompt += f"Agent {idx} response:\n{agent[-1]['content']}\n\n"
-    summary_prompt += "Please provide a concise summary of the different approaches and answers given by the agents."
+def format_prompt(question, instruction, previous_responses=None):
+    prompt = f"""Question: {question}
 
-    if debug:
-        print(f"\n[DEBUG] Summarization prompt:\n{summary_prompt}")
+Your task is to solve this math problem, provide a final answer in the format: \\boxed{{your_numerical_answer_here}}, ensure that the boxed answer is the last thing in your response.
+{instruction}
+"""
+    if previous_responses:
+        prompt += "Previous responses from other agents:\n\n"
+        for i, response in enumerate(previous_responses):
+            prompt += f"Agent {i}:\n{response}\n\n"
 
-    summary = generate_text(pipe, summary_prompt, generation_args, debug)
-
-    if debug:
-        print(f"[DEBUG] Summary:\n{summary}")
-
-    return summary
+    prompt += "Your response:\n"
+    return prompt
 
 
 def generate_gsm(num_agents, question):
-    instruction = "Please solve the problem."
     return [
-        [{"model": f"model_{i}", "content": format_prompt(question, instruction)}]
+        [{"model": f"model_{i}", "content": format_prompt(question, "")}]
         for i in range(num_agents)
     ]
 
 
-def read_jsonl(path):
-    with open(path, "r") as file:
-        return [json.loads(line) for line in file if line.strip()]
-
-
 def run_debate(pipe, question, num_agents, num_rounds, generation_args, debug=False):
     agent_contexts = generate_gsm(num_agents, question)
-    summaries = []
 
     if debug:
         print(f"\n[DEBUG] Starting debate on question:\n{question}")
@@ -102,26 +72,16 @@ def run_debate(pipe, question, num_agents, num_rounds, generation_args, debug=Fa
             print(f"\n[DEBUG] Round {round} of debate")
 
         if round != 0:
-            summary = summarize_responses(
-                pipe, agent_contexts, question, generation_args, debug
-            )
-            summaries.append(summary)
-            instruction = "Based on the summary of other agents' thoughts, please reconsider your approach. If you find merit in other methods, incorporate them. If you believe your method is correct, defend it with additional explanation."
-            for agent_context in agent_contexts:
-                prompt = format_prompt(
-                    question, instruction, agent_context[-1]["content"], summary
-                )
+            instruction = "Based on the previous responses from other agents, please reconsider your approach. If you find merit in other methods, incorporate them. If you believe your method is correct, defend it with additional explanation."
+            previous_responses = [agent[-1]["content"] for agent in agent_contexts]
+            for i, agent_context in enumerate(agent_contexts):
+                other_responses = previous_responses[:i] + previous_responses[i + 1 :]
+                prompt = format_prompt(question, instruction, other_responses)
                 agent_context.append(
                     {"model": agent_context[-1]["model"], "content": prompt}
                 )
-        else:
-            instruction = (
-                "Please solve the problem and explain your reasoning step by step."
-            )
 
         for i, agent_context in enumerate(agent_contexts):
-            if debug:
-                print(f"\n[DEBUG] Agent {i} thinking...")
             response = generate_text(
                 pipe, agent_context[-1]["content"], generation_args, debug
             )
@@ -129,7 +89,12 @@ def run_debate(pipe, question, num_agents, num_rounds, generation_args, debug=Fa
                 {"model": agent_context[-1]["model"], "content": response}
             )
 
-    return agent_contexts, summaries
+    return agent_contexts
+
+
+def read_jsonl(path: str):
+    with open(path, "r") as fh:
+        return [json.loads(line) for line in fh.readlines() if line]
 
 
 def main():
@@ -159,16 +124,12 @@ def main():
         question = questions[idx]["question"]
         answer = questions[idx]["answer"]
 
-        agent_contexts, summaries = run_debate(
+        agent_contexts = run_debate(
             pipe, question, args.num_agents, args.rounds, generation_args, args.debug
         )
 
         models_response = {
-            f"model_{i}": [
-                context[1]["content"],
-                context[3]["content"],
-                context[-1]["content"],
-            ]
+            f"model_{i}": [context[j]["content"] for j in range(1, len(context), 2)]
             for i, context in enumerate(agent_contexts)
         }
 
@@ -177,7 +138,6 @@ def main():
                 "question_id": idx,
                 "question": question,
                 "agent_response": models_response,
-                "summarization": summaries,
                 "answer": answer,
             }
         )
