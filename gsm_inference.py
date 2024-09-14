@@ -6,32 +6,58 @@ import time
 from tqdm import tqdm
 import argparse
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, set_seed
 
-torch.random.manual_seed(0)
-model = AutoModelForCausalLM.from_pretrained(
-    "microsoft/Phi-3-mini-4k-instruct",
-    device_map="cuda",
-    torch_dtype="auto",
-    trust_remote_code=True,
-    # attn_implementation="flash_attention_2",
-)
 
-tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+# torch.random.manual_seed(0)
 
-pipe = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
-)
 
-generation_args = {
-    "max_new_tokens": 500,
-    "return_full_text": False,
-    "temperature": 0.7,
-    "do_sample": True,
-    "top_p": 0.95,
-}
+# model = AutoModelForCausalLM.from_pretrained(
+#     "microsoft/Phi-3-mini-4k-instruct",
+#     device_map="cuda",
+#     torch_dtype="auto",
+#     trust_remote_code=True,
+#     # attn_implementation="flash_attention_2",
+# )
+
+# tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+
+# pipe = pipeline(
+#     "text-generation",
+#     model=model,
+#     tokenizer=tokenizer,
+# )
+
+# generation_args = {
+#     "max_new_tokens": 500,
+#     "return_full_text": False,
+#     "temperature": 0.7,
+#     "do_sample": True,
+#     "top_p": 0.95,
+# }
+
+generator = pipeline("text-generation", model="gpt2")
+set_seed(42)
+
+
+def ask_phi3(message):
+    input = [{"role": "user", "content": message}]
+    output = pipe(input, **generation_args)
+    return output[0]["generated_text"]
+
+
+def ask_gpt2(message):
+    output = generator(message)
+    return output[0]["generated_text"]
+
+
+def ask_llm(message, llm):
+    if llm == "phi3":
+        return ask_phi3(message)
+    elif llm == "gpt2":
+        return ask_gpt2(message)
+    else:
+        raise ValueError(f"Model {llm} not supported")
 
 
 def args_parse():
@@ -39,16 +65,12 @@ def args_parse():
     parser.add_argument("--round", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default=100, type=int)
+    parser.add_argument("--llm", default="gpt2", type=str)
     return parser.parse_args()
 
 
-def construct_message(agent_context, instruction, idx):
-
-    message = [{"role": "user", "content": agent_context}]
-
-    output = pipe(message, **generation_args)
-
-    completion = output[0]["generated_text"]
+def construct_message(agent_context, instruction, idx, llm):
+    completion = ask_llm(agent_context, llm)
 
     prefix_string = f"Here is a summary of responses from other agents: {completion}"
     prefix_string = (
@@ -59,7 +81,7 @@ def construct_message(agent_context, instruction, idx):
     return prefix_string
 
 
-def summarize_message(agent_contexts, instruction, idx):
+def summarize_message(agent_contexts, instruction, idx, llm):
     prefix_string = "Here are a list of opinions from different agents: "
 
     for agent in agent_contexts:
@@ -72,7 +94,7 @@ def summarize_message(agent_contexts, instruction, idx):
         prefix_string
         + "\n\n Write a summary of the different opinions from each of the individual agent."
     )
-    completion = construct_message(prefix_string, instruction, idx)
+    completion = construct_message(prefix_string, instruction, idx, llm)
 
     return completion
 
@@ -97,11 +119,10 @@ def read_jsonl(path: str):
 
 if __name__ == "__main__":
     args = args_parse()
+    llm = args.llm
 
     def generate_answer(model, formatted_prompt):
-        input = [{"role": "user", "content": formatted_prompt}]
-        output = pipe(input, **generation_args)
-        generated_text = output[0]["generated_text"]
+        generated_text = ask_llm(formatted_prompt, llm)
         return {"model": model, "content": generated_text}
 
     def prompt_formatting(model, instruction):
@@ -137,7 +158,7 @@ if __name__ == "__main__":
             # Refer to the summarized previous response
             if debate != 0:
                 message.append(
-                    summarize_message(agent_contexts, question, 2 * debate - 1)
+                    summarize_message(agent_contexts, question, 2 * debate - 1, llm)
                 )
                 for i in range(len(agent_contexts)):
                     agent_contexts[i].append(
