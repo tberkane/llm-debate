@@ -27,55 +27,58 @@ def setup_model_and_pipeline():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
+def format_prompt(question, instruction, previous_response=None, summary=None):
+    prompt = f"""Question: {question}
+
+    Your task is to solve this math problem. Please follow these guidelines:
+    1. Provide a final answer in the format: \\boxed{{your_numerical_answer_here}}
+    2. Ensure that the boxed answer is the last thing in your response.
+
+    {f'Previous response: {previous_response}' if previous_response else ''}
+
+    {f'Summary of other agents\' thoughts: {summary}' if summary else ''}
+
+    {instruction}
+
+    Your response:
+    """
+    return prompt
+
+
 
 def generate_text(pipe, input_text, generation_args, debug=False):
     message = [{"role": "user", "content": input_text}]
     if debug:
-        print(
-            f"\n[DEBUG] Input to model: {input_text[:100]}..."
-        )  # Print first 100 chars
+        print(f"\n[DEBUG] Input to model:\n{input_text}")
     output = pipe(message, **generation_args)
     generated_text = output[0]["generated_text"]
     if debug:
-        print(
-            f"[DEBUG] Model output: {generated_text[:100]}..."
-        )  # Print first 100 chars
+        print(f"[DEBUG] Model output:\n{generated_text}")
     return generated_text
 
 
-def summarize_responses(
-    pipe, agent_contexts, instruction, generation_args, debug=False
-):
-    summary_prompt = "Here are a list of opinions from different agents: "
+def summarize_responses(pipe, agent_contexts, question, generation_args, debug=False):
+    summary_prompt = "Here are the responses from different agents to the following question:\n\n"
+    summary_prompt += f"Question: {question}\n\n"
     for idx, agent in enumerate(agent_contexts):
-        summary_prompt += f"\n\nResponse from agent {idx}: ```{agent[-1]['content']}```"
-    summary_prompt += "\n\nWrite a summary of the different opinions from each of the individual agent."
-
+        summary_prompt += f"Agent {idx} response:\n{agent[-1]['content']}\n\n"
+    summary_prompt += "Please provide a concise summary of the different approaches and answers given by the agents."
+    
     if debug:
-        print(
-            f"\n[DEBUG] Summarization prompt: {summary_prompt[:200]}..."
-        )  # Print first 200 chars
-
+        print(f"\n[DEBUG] Summarization prompt:\n{summary_prompt}")
+    
     summary = generate_text(pipe, summary_prompt, generation_args, debug)
-
-    final_prompt = f"Here is a summary of responses from other agents: {summary}\n\nUse this summarization carefully as additional advice. Can you provide an updated answer? Make sure to state your answer at the end of the response.{instruction}"
-
+    
     if debug:
-        print(
-            f"[DEBUG] Final prompt after summarization: {final_prompt[:200]}..."
-        )  # Print first 200 chars
-
-    return final_prompt
+        print(f"[DEBUG] Summary:\n{summary}")
+    
+    return summary
 
 
 def generate_gsm(num_agents, question):
+    instruction = "Please solve the problem."
     return [
-        [
-            {
-                "model": f"model_{i}",
-                "content": f"Can you solve the following math problem? {question} Explain your reasoning. Your final answer should be a single numerical number, in the form \\boxed{{answer}}, and should be the very last numerical value mentioned in your response.",
-            }
-        ]
+        [{"model": f"model_{i}", "content": format_prompt(question, instruction)}]
         for i in range(num_agents)
     ]
 
@@ -90,31 +93,27 @@ def run_debate(pipe, question, num_agents, num_rounds, generation_args, debug=Fa
     summaries = []
 
     if debug:
-        print(f"\n[DEBUG] Starting debate on question: {question}")
+        print(f"\n[DEBUG] Starting debate on question:\n{question}")
 
     for round in range(num_rounds + 1):
         if debug:
             print(f"\n[DEBUG] Round {round} of debate")
-
+        
         if round != 0:
-            summary = summarize_responses(
-                pipe, agent_contexts, question, generation_args, debug
-            )
+            summary = summarize_responses(pipe, agent_contexts, question, generation_args, debug)
             summaries.append(summary)
+            instruction = "Based on the summary of other agents' thoughts, please reconsider your approach. If you find merit in other methods, incorporate them. If you believe your method is correct, defend it with additional explanation."
             for agent_context in agent_contexts:
-                agent_context.append(
-                    {"model": agent_context[-1]["model"], "content": summary}
-                )
+                prompt = format_prompt(question, instruction, agent_context[-1]['content'], summary)
+                agent_context.append({"model": agent_context[-1]["model"], "content": prompt})
+        else:
+            instruction = "Please solve the problem and explain your reasoning step by step."
 
         for i, agent_context in enumerate(agent_contexts):
             if debug:
                 print(f"\n[DEBUG] Agent {i} thinking...")
-            response = generate_text(
-                pipe, agent_context[-1]["content"], generation_args, debug
-            )
-            agent_context.append(
-                {"model": agent_context[-1]["model"], "content": response}
-            )
+            response = generate_text(pipe, agent_context[-1]["content"], generation_args, debug)
+            agent_context.append({"model": agent_context[-1]["model"], "content": response})
 
     return agent_contexts, summaries
 
