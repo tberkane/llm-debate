@@ -27,6 +27,7 @@ def setup_model_and_pipeline():
     tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
     return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
+
 def format_prompt(question, instruction, previous_response=None, summary=None):
     prompt = f"""Question: {question}
 
@@ -36,14 +37,13 @@ def format_prompt(question, instruction, previous_response=None, summary=None):
 
     {f'Previous response: {previous_response}' if previous_response else ''}
 
-    {f'Summary of other agents\' thoughts: {summary}' if summary else ''}
+    {f'Summary of other agents thoughts: {summary}' if summary else ''}
 
     {instruction}
 
     Your response:
     """
     return prompt
-
 
 
 def generate_text(pipe, input_text, generation_args, debug=False):
@@ -58,20 +58,22 @@ def generate_text(pipe, input_text, generation_args, debug=False):
 
 
 def summarize_responses(pipe, agent_contexts, question, generation_args, debug=False):
-    summary_prompt = "Here are the responses from different agents to the following question:\n\n"
+    summary_prompt = (
+        "Here are the responses from different agents to the following question:\n\n"
+    )
     summary_prompt += f"Question: {question}\n\n"
     for idx, agent in enumerate(agent_contexts):
         summary_prompt += f"Agent {idx} response:\n{agent[-1]['content']}\n\n"
     summary_prompt += "Please provide a concise summary of the different approaches and answers given by the agents."
-    
+
     if debug:
         print(f"\n[DEBUG] Summarization prompt:\n{summary_prompt}")
-    
+
     summary = generate_text(pipe, summary_prompt, generation_args, debug)
-    
+
     if debug:
         print(f"[DEBUG] Summary:\n{summary}")
-    
+
     return summary
 
 
@@ -98,22 +100,34 @@ def run_debate(pipe, question, num_agents, num_rounds, generation_args, debug=Fa
     for round in range(num_rounds + 1):
         if debug:
             print(f"\n[DEBUG] Round {round} of debate")
-        
+
         if round != 0:
-            summary = summarize_responses(pipe, agent_contexts, question, generation_args, debug)
+            summary = summarize_responses(
+                pipe, agent_contexts, question, generation_args, debug
+            )
             summaries.append(summary)
             instruction = "Based on the summary of other agents' thoughts, please reconsider your approach. If you find merit in other methods, incorporate them. If you believe your method is correct, defend it with additional explanation."
             for agent_context in agent_contexts:
-                prompt = format_prompt(question, instruction, agent_context[-1]['content'], summary)
-                agent_context.append({"model": agent_context[-1]["model"], "content": prompt})
+                prompt = format_prompt(
+                    question, instruction, agent_context[-1]["content"], summary
+                )
+                agent_context.append(
+                    {"model": agent_context[-1]["model"], "content": prompt}
+                )
         else:
-            instruction = "Please solve the problem and explain your reasoning step by step."
+            instruction = (
+                "Please solve the problem and explain your reasoning step by step."
+            )
 
         for i, agent_context in enumerate(agent_contexts):
             if debug:
                 print(f"\n[DEBUG] Agent {i} thinking...")
-            response = generate_text(pipe, agent_context[-1]["content"], generation_args, debug)
-            agent_context.append({"model": agent_context[-1]["model"], "content": response})
+            response = generate_text(
+                pipe, agent_context[-1]["content"], generation_args, debug
+            )
+            agent_context.append(
+                {"model": agent_context[-1]["model"], "content": response}
+            )
 
     return agent_contexts, summaries
 
