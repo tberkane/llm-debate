@@ -50,7 +50,7 @@ def answer_check(List, answer):
 
 def compute_accuracy(gt, pred_solutions):
     answers = solve_math_problems(gt)
-    print(f"Answers: {answers}")
+    # print(f"Answers: {answers}")
 
     if not answers:
         return None
@@ -66,7 +66,7 @@ def compute_accuracy(gt, pred_solutions):
 
             pred_answers.append(pred_answer)
 
-        print(f"Pred Answers: {pred_answers}")
+        # print(f"Pred Answers: {pred_answers}")
         return answer_check(pred_answers, answers)
 
 

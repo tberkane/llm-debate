@@ -72,7 +72,7 @@ def summarize_message(agent_contexts, instruction, idx):
 
     prefix_string = (
         prefix_string
-        + "\n\n Write an impartial summary of the different opinions from each of the individual agent."
+        + "\n\n Write a summary of the different opinions from each of the individual agent."
     )
 
     completion = construct_message(prefix_string, instruction, idx)
@@ -105,9 +105,9 @@ if __name__ == "__main__":
 
     def generate_answer(model, formatted_prompt):
         input = [{"role": "user", "content": formatted_prompt}]
-        print(f"[DEBUG] LLM Input: {input}")
+        print(f"[DEBUG] {model} Input: {input}")
         output = pipe(input, **generation_args)
-        print(f"[DEBUG] LLM Output: {output}")
+        print(f"[DEBUG] {model} Output: {output}")
 
         generated_text = output[0]["generated_text"]
         return {"model": model, "content": generated_text}
