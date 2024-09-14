@@ -3,6 +3,7 @@ import numpy as np
 import time
 import re
 import argparse
+from collections import Counter
 
 
 def args_parse():
@@ -41,33 +42,32 @@ def parse_answer(input_str):
         return solution
 
 
-def answer_check(List, answer):
-    if answer in List:
-        return 1.0
-    else:
-        return 0.0
+def get_most_frequent_answer(answers):
+    answer_counts = Counter(answers)
+    if not answer_counts:
+        return None
+    return max(answer_counts, key=answer_counts.get)
+
+
+def answer_check(pred_answers, gt_answer):
+    most_frequent = get_most_frequent_answer(pred_answers)
+    return float(most_frequent == gt_answer) if most_frequent is not None else 0.0
 
 
 def compute_accuracy(gt, pred_solutions):
-    answers = solve_math_problems(gt)
-    # print(f"Answers: {answers}")
-
-    if not answers:
+    gt_answer = solve_math_problems(gt)
+    if not gt_answer:
         return None
 
-    if type(pred_solutions) == list:
-        pred_answers = []
-
-        for pred_solution in pred_solutions:
-            pred_answer = parse_answer(pred_solution)
-
-            if not pred_answer:
-                pred_answer = solve_math_problems(pred_solution)
-
+    pred_answers = []
+    for pred_solution in pred_solutions:
+        pred_answer = parse_answer(pred_solution)
+        if not pred_answer:
+            pred_answer = solve_math_problems(pred_solution)
+        if pred_answer is not None:
             pred_answers.append(pred_answer)
 
-        # print(f"Pred Answers: {pred_answers}")
-        return answer_check(pred_answers, answers)
+    return answer_check(pred_answers, gt_answer)
 
 
 if __name__ == "__main__":
