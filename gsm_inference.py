@@ -28,7 +28,6 @@ pipe = pipeline(
 generation_args = {
     "max_new_tokens": 500,
     "return_full_text": False,
-    "temperature": 0.7,
     "do_sample": True,
     "top_p": 0.95,
 }
@@ -40,6 +39,7 @@ def args_parse():
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default=100, type=int)
     parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument("--temperature", default=0.7, type=float)
     return parser.parse_args()
 
 
@@ -47,11 +47,10 @@ def construct_message(agent_context, instruction, idx):
 
     message = [{"role": "user", "content": agent_context}]
 
-    print(f"[DEBUG] Summarization Input: {message}")
+    print(f"[DEBUG] Summarization Input: {agent_context}")
     output = pipe(message, **generation_args)
-    print(f"[DEBUG] Summarization Output: {output}")
-
     completion = output[0]["generated_text"]
+    print(f"[DEBUG] Summarization Output: {completion}")
 
     prefix_string = f"Here is a summary of responses from other agents: {completion}"
     prefix_string = (
@@ -102,6 +101,8 @@ def read_jsonl(path: str):
 
 if __name__ == "__main__":
     args = args_parse()
+
+    generation_args["temperature"] = args.temperature
 
     def generate_answer(model, formatted_prompt):
         input = [{"role": "user", "content": formatted_prompt}]
