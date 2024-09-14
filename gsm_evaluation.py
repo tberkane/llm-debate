@@ -91,9 +91,12 @@ if __name__ == "__main__":
             gt = response_dict[idx]["answer"]
             print(f"Question: {questions[idx]}")
             print(f"Ground Truth: {gt}")
-            print("Responses:")
+            print("Extracted Answers:")
             for i, response in enumerate(responses):
-                print(f"Response {i+1}: {response}")
+                extracted_answer = parse_answer(response)
+                if extracted_answer is None:
+                    extracted_answer = solve_math_problems(response)
+                print(f"Agent {i+1}: {extracted_answer}")
             accurate = compute_accuracy(gt, responses)
 
             if accurate is not None:

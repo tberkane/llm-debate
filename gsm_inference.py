@@ -47,7 +47,6 @@ def construct_message(agent_context, instruction, idx):
 
     message = [{"role": "user", "content": agent_context}]
 
-    print(f"[DEBUG] Summarization Input: {agent_context}")
     output = pipe(message, **generation_args)
     completion = output[0]["generated_text"]
     print(f"[DEBUG] Summarization Output: {completion}")
