@@ -10,38 +10,38 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, set_seed
 
 
 # Phi3
-# torch.random.manual_seed(0)
-# model = AutoModelForCausalLM.from_pretrained(
-#     "microsoft/Phi-3-mini-4k-instruct",
-#     device_map="cuda",
-#     torch_dtype="auto",
-#     trust_remote_code=True,
-#     # attn_implementation="flash_attention_2",
-# )
-# tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
-# pipe = pipeline(
-#     "text-generation",
-#     model=model,
-#     tokenizer=tokenizer,
-# )
-# generation_args = {
-#     "max_new_tokens": 500,
-#     "return_full_text": False,
-#     "temperature": 0.7,
-#     "do_sample": True,
-#     "top_p": 0.95,
-# }
+torch.random.manual_seed(0)
+model = AutoModelForCausalLM.from_pretrained(
+    "microsoft/Phi-3-mini-4k-instruct",
+    device_map="cuda",
+    torch_dtype="auto",
+    trust_remote_code=True,
+    attn_implementation="flash_attention_2",
+)
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+pipe = pipeline(
+    "text-generation",
+    model=model,
+    tokenizer=tokenizer,
+)
+generation_args = {
+    "max_new_tokens": 500,
+    "return_full_text": False,
+    "temperature": 0.7,
+    "do_sample": True,
+    "top_p": 0.95,
+}
 
 # GPT2
 # generator = pipeline("text-generation", model="gpt2")
 # set_seed(42)
 
 # Qwen
-model_name = "Qwen/Qwen2-0.5B"
-model = AutoModelForCausalLM.from_pretrained(
-    model_name, torch_dtype="auto", device_map="auto"
-)
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+# model_name = "Qwen/Qwen2-0.5B"
+# model = AutoModelForCausalLM.from_pretrained(
+#     model_name, torch_dtype="auto", device_map="auto"
+# )
+# tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 
 def ask_phi3(message):
@@ -96,7 +96,7 @@ def args_parse():
     parser.add_argument("--round", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default=100, type=int)
-    parser.add_argument("--llm", default="qwen", type=str)
+    parser.add_argument("--llm", default="phi3", type=str)
     parser.add_argument("--debug", action="store_true", help="Enable debug prints")
     return parser.parse_args()
 

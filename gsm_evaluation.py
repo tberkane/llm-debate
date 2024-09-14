@@ -10,7 +10,7 @@ def args_parse():
     parser.add_argument("--turns", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default="100", type=str)
-    parser.add_argument("--llm", default="qwen", type=str)
+    parser.add_argument("--llm", default="phi3", type=str)
     return parser.parse_args()
 
 
