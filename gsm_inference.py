@@ -6,24 +6,25 @@ import time
 from tqdm import tqdm
 import argparse
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline, set_seed
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-
-# Phi3
 torch.random.manual_seed(0)
 model = AutoModelForCausalLM.from_pretrained(
     "microsoft/Phi-3-mini-4k-instruct",
     device_map="cuda",
     torch_dtype="auto",
     trust_remote_code=True,
-    attn_implementation="flash_attention_2",
+    # attn_implementation="flash_attention_2",
 )
+
 tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+
 pipe = pipeline(
     "text-generation",
     model=model,
     tokenizer=tokenizer,
 )
+
 generation_args = {
     "max_new_tokens": 500,
     "return_full_text": False,
@@ -32,77 +33,24 @@ generation_args = {
     "top_p": 0.95,
 }
 
-# GPT2
-# generator = pipeline("text-generation", model="gpt2")
-# set_seed(42)
-
-# Qwen
-# model_name = "Qwen/Qwen2-0.5B"
-# model = AutoModelForCausalLM.from_pretrained(
-#     model_name, torch_dtype="auto", device_map="auto"
-# )
-# tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-
-def ask_phi3(message):
-    input = [{"role": "user", "content": message}]
-    output = pipe(input, **generation_args)
-    return output[0]["generated_text"]
-
-
-def ask_gpt2(message):
-    output = generator(message)
-    return output[0]["generated_text"]
-
-
-def ask_qwen(message):
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": message},
-    ]
-    text = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    model_inputs = tokenizer([text], return_tensors="pt").to("cuda")
-
-    generated_ids = model.generate(**model_inputs, max_new_tokens=512)
-    generated_ids = [
-        output_ids[len(input_ids) :]
-        for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-    ]
-
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    return response
-
-
-def ask_llm(message, llm, debug=False):
-    if debug:
-        print(f"LLM Input: {message}")
-    if llm == "phi3":
-        output = ask_phi3(message)
-    elif llm == "gpt2":
-        output = ask_gpt2(message)
-    elif llm == "qwen":
-        output = ask_qwen(message)
-    else:
-        raise ValueError(f"Model {llm} not supported")
-    if debug:
-        print(f"LLM Output: {output}")
-    return output
-
 
 def args_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--round", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default=100, type=int)
-    parser.add_argument("--llm", default="phi3", type=str)
-    parser.add_argument("--debug", action="store_true", help="Enable debug prints")
     return parser.parse_args()
 
 
-def construct_message(agent_context, instruction, idx, llm, debug=False):
-    completion = ask_llm(agent_context, llm, debug)
+def construct_message(agent_context, instruction, idx):
+
+    message = [{"role": "user", "content": agent_context}]
+
+    print(f"[DEBUG] construct_message - LLM Input: {message}")
+    output = pipe(message, **generation_args)
+    print(f"[DEBUG] construct_message - LLM Output: {output}")
+
+    completion = output[0]["generated_text"]
 
     prefix_string = f"Here is a summary of responses from other agents: {completion}"
     prefix_string = (
@@ -110,10 +58,12 @@ def construct_message(agent_context, instruction, idx, llm, debug=False):
         + "\n\n Use this summarization carefully as additional advice, can you provide an updated answer? Make sure to state your answer at the end of the response."
         + instruction
     )
+
+    print(f"[DEBUG] construct_message - Output prefix_string: {prefix_string}")
     return prefix_string
 
 
-def summarize_message(agent_contexts, instruction, idx, llm, debug=False):
+def summarize_message(agent_contexts, instruction, idx):
     prefix_string = "Here are a list of opinions from different agents: "
 
     for agent in agent_contexts:
@@ -126,7 +76,12 @@ def summarize_message(agent_contexts, instruction, idx, llm, debug=False):
         prefix_string
         + "\n\n Write a summary of the different opinions from each of the individual agent."
     )
-    completion = construct_message(prefix_string, instruction, idx, llm, debug)
+
+    print(
+        f"[DEBUG] summarize_message - Calling construct_message with prefix_string: {prefix_string}"
+    )
+    completion = construct_message(prefix_string, instruction, idx)
+    print(f"[DEBUG] summarize_message - Output completion: {completion}")
 
     return completion
 
@@ -151,11 +106,14 @@ def read_jsonl(path: str):
 
 if __name__ == "__main__":
     args = args_parse()
-    llm = args.llm
-    debug = args.debug
 
     def generate_answer(model, formatted_prompt):
-        generated_text = ask_llm(formatted_prompt, llm, debug)
+        input = [{"role": "user", "content": formatted_prompt}]
+        print(f"[DEBUG] generate_answer - LLM Input: {input}")
+        output = pipe(input, **generation_args)
+        print(f"[DEBUG] generate_answer - LLM Output: {output}")
+
+        generated_text = output[0]["generated_text"]
         return {"model": model, "content": generated_text}
 
     def prompt_formatting(model, instruction):
@@ -175,7 +133,7 @@ if __name__ == "__main__":
     questions = read_jsonl("gsm8k_test.jsonl")
     random.shuffle(questions)
 
-    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval_{llm}.json"
+    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
 
     for idx in tqdm(range(evaluation)):
         question = questions[idx]["question"]
@@ -187,14 +145,11 @@ if __name__ == "__main__":
 
         # Debate
         for debate in range(rounds + 1):
-            if debug:
-                print(f"\nDebug - Debate round: {debate}")
+            print(f"\n[DEBUG] Main loop - Debate round {debate}")
             # Refer to the summarized previous response
             if debate != 0:
                 message.append(
-                    summarize_message(
-                        agent_contexts, question, 2 * debate - 1, llm, debug
-                    )
+                    summarize_message(agent_contexts, question, 2 * debate - 1)
                 )
                 for i in range(len(agent_contexts)):
                     agent_contexts[i].append(
