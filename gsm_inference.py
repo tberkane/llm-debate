@@ -1,41 +1,14 @@
-import requests
-import json
-import numpy as np
-import random
-import time
-from tqdm import tqdm
 import argparse
+import json
+import random
 import torch
+from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-torch.random.manual_seed(0)
-model = AutoModelForCausalLM.from_pretrained(
-    "microsoft/Phi-3-mini-4k-instruct",
-    device_map="cuda",
-    torch_dtype="auto",
-    trust_remote_code=True,
-    # attn_implementation="flash_attention_2",
-)
 
-tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
-
-pipe = pipeline(
-    "text-generation",
-    model=model,
-    tokenizer=tokenizer,
-)
-
-generation_args = {
-    "max_new_tokens": 500,
-    "return_full_text": False,
-    "do_sample": True,
-    "top_p": 0.95,
-}
-
-
-def args_parse():
+def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--round", default=2, type=int)
+    parser.add_argument("--rounds", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default=100, type=int)
     parser.add_argument("--seed", default=0, type=int)
@@ -43,148 +16,129 @@ def args_parse():
     return parser.parse_args()
 
 
-def construct_message(agent_context, instruction, idx):
+def setup_model_and_pipeline():
+    model = AutoModelForCausalLM.from_pretrained(
+        "microsoft/Phi-3-mini-4k-instruct",
+        device_map="cuda",
+        torch_dtype="auto",
+        trust_remote_code=True,
+    )
+    tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-3-mini-4k-instruct")
+    return pipeline("text-generation", model=model, tokenizer=tokenizer)
 
-    message = [{"role": "user", "content": agent_context}]
 
+def generate_text(pipe, input_text, generation_args):
+    message = [{"role": "user", "content": input_text}]
     output = pipe(message, **generation_args)
-    completion = output[0]["generated_text"]
-    print(f"[DEBUG] Summarization Output: {completion}")
-
-    prefix_string = f"Here is a summary of responses from other agents: {completion}"
-    prefix_string = (
-        prefix_string
-        + "\n\n Use this summarization carefully as additional advice, can you provide an updated answer? Make sure to state your answer at the end of the response."
-        + instruction
-    )
-
-    return prefix_string
+    return output[0]["generated_text"]
 
 
-def summarize_message(agent_contexts, instruction, idx):
-    prefix_string = "Here are a list of opinions from different agents: "
+def summarize_responses(pipe, agent_contexts, instruction, generation_args):
+    summary_prompt = "Here are a list of opinions from different agents: "
+    for idx, agent in enumerate(agent_contexts):
+        summary_prompt += f"\n\nResponse from agent {idx}: ```{agent[-1]['content']}```"
+    summary_prompt += "\n\nWrite a summary of the different opinions from each of the individual agent."
 
-    for agent in agent_contexts:
-        agent_response = agent[-1]["content"]
-        response = f"\n\n Response from agent {idx}: ```{agent_response}```"
-
-        prefix_string = prefix_string + response
-
-    prefix_string = (
-        prefix_string
-        + "\n\n Write a summary of the different opinions from each of the individual agent."
-    )
-
-    completion = construct_message(prefix_string, instruction, idx)
-
-    return completion
+    summary = generate_text(pipe, summary_prompt, generation_args)
+    return f"Here is a summary of responses from other agents: {summary}\n\nUse this summarization carefully as additional advice. Can you provide an updated answer? Make sure to state your answer at the end of the response.{instruction}"
 
 
-def generate_gsm(agents, question):
-    agent_contexts = [
+def generate_gsm(num_agents, question):
+    return [
         [
             {
-                "model": agent,
-                "content": f"Can you solve the following math problem? {question} Explain your reasoning. Your final answer should be a single numerical number, in the form \\boxed{{answer}}, at the end of your response.",
+                "model": f"model_{i}",
+                "content": f"Can you solve the following math problem? {question} Explain your reasoning. Your final answer should be a single numerical number, in the form \\boxed{{answer}}, and should be the very last numerical value mentioned in your response.",
             }
         ]
-        for agent in agents
+        for i in range(num_agents)
     ]
-    return agent_contexts
 
 
-def read_jsonl(path: str):
-    with open(path, "r") as fh:
-        return [json.loads(line) for line in fh.readlines() if line]
+def read_jsonl(path):
+    with open(path, "r") as file:
+        return [json.loads(line) for line in file if line.strip()]
 
 
-if __name__ == "__main__":
-    args = args_parse()
+def run_debate(pipe, question, num_agents, num_rounds, generation_args):
+    agent_contexts = generate_gsm(num_agents, question)
+    summaries = []
 
-    generation_args["temperature"] = args.temperature
+    for round in range(num_rounds + 1):
+        if round != 0:
+            summary = summarize_responses(
+                pipe, agent_contexts, question, generation_args
+            )
+            summaries.append(summary)
+            for agent_context in agent_contexts:
+                agent_context.append(
+                    {"model": agent_context[-1]["model"], "content": summary}
+                )
 
-    def generate_answer(model, formatted_prompt):
-        input = [{"role": "user", "content": formatted_prompt}]
-        print(f"[DEBUG] {model} Input: {input}")
-        output = pipe(input, **generation_args)
-        print(f"[DEBUG] {model} Output: {output}")
+        for agent_context in agent_contexts:
+            response = generate_text(
+                pipe, agent_context[-1]["content"], generation_args
+            )
+            agent_context.append(
+                {"model": agent_context[-1]["model"], "content": response}
+            )
 
-        generated_text = output[0]["generated_text"]
-        return {"model": model, "content": generated_text}
+    return agent_contexts, summaries
 
-    def prompt_formatting(model, instruction):
-        prompt = f"User:\n{instruction}\n\nAssistant:\n"
 
-        return {"model": model, "content": prompt}
-
-    agents = args.num_agents
-    rounds = args.round
-    model_list = [f"model_{i}" for i in range(agents)]
+def main():
+    args = parse_arguments()
+    torch.random.manual_seed(args.seed)
     random.seed(args.seed)
 
-    evaluation = args.evaluation
-
-    generated_description = []
+    pipe = setup_model_and_pipeline()
+    generation_args = {
+        "max_new_tokens": 500,
+        "return_full_text": False,
+        "do_sample": True,
+        "top_p": 0.95,
+        "temperature": args.temperature,
+    }
 
     questions = read_jsonl("gsm8k_test.jsonl")
     random.shuffle(questions)
 
-    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
+    results = []
+    file_name = f"gsm_result_{args.num_agents}agents_{args.rounds}turns_{args.evaluation}eval.json"
 
-    for idx in tqdm(range(evaluation)):
+    for idx in tqdm(range(args.evaluation)):
         question = questions[idx]["question"]
         answer = questions[idx]["answer"]
 
-        agent_contexts = generate_gsm(model_list, question)
-
-        message = []
-
-        # Debate
-        for debate in range(rounds + 1):
-            print(f"\n[DEBUG] Main loop - Debate round {debate}")
-            # Refer to the summarized previous response
-            if debate != 0:
-                message.append(
-                    summarize_message(agent_contexts, question, 2 * debate - 1)
-                )
-                for i in range(len(agent_contexts)):
-                    agent_contexts[i].append(
-                        prompt_formatting(agent_contexts[i][-1]["model"], message)
-                    )
-
-            for agent_context in agent_contexts:
-                # Generate new response based on summarized response
-                completion = generate_answer(
-                    agent_context[-1]["model"], agent_context[-1]["content"]
-                )
-                agent_context.append(completion)
-
-        print(f"\n[DEBUG] Question No.{idx+1} debate is ended.")
+        agent_contexts, summaries = run_debate(
+            pipe, question, args.num_agents, args.rounds, generation_args
+        )
 
         models_response = {
             f"model_{i}": [
-                agent_contexts[i][1]["content"],
-                agent_contexts[i][3]["content"],
-                agent_contexts[i][-1]["content"],
+                context[1]["content"],
+                context[3]["content"],
+                context[-1]["content"],
             ]
-            for i in range(len(model_list))
+            for i, context in enumerate(agent_contexts)
         }
-        response_summarization = [message[0], message[1]]
-        generated_description.append(
+
+        results.append(
             {
                 "question_id": idx,
                 "question": question,
                 "agent_response": models_response,
-                "summarization": response_summarization,
+                "summarization": summaries,
                 "answer": answer,
             }
         )
 
-        # Save results after each evaluation
         with open(file_name, "w") as f:
-            json.dump(generated_description, f, indent=4)
+            json.dump(results, f, indent=4)
 
-        print(f"[DEBUG] Results saved after question {idx+1}")
+    print(f"Results saved to '{file_name}'")
+    print("All done!")
 
-    print(f"[DEBUG] The result file '{file_name}' is saved.")
-    print("All done!!")
+
+if __name__ == "__main__":
+    main()
