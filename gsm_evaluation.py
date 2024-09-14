@@ -89,7 +89,9 @@ if __name__ == "__main__":
                 for i in range(num_agents)
             ]
             gt = response_dict[idx]["answer"]
-            print(responses)
+            print(f"Question: {questions[idx]}")
+            print(f"Ground Truth: {gt}")
+            print(f"Responses: {responses}")
             accurate = compute_accuracy(gt, responses)
 
             if accurate is not None:
