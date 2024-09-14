@@ -46,9 +46,9 @@ def construct_message(agent_context, instruction, idx):
 
     message = [{"role": "user", "content": agent_context}]
 
-    print(f"[DEBUG] construct_message - LLM Input: {message}")
+    print(f"[DEBUG] Summarization Input: {message}")
     output = pipe(message, **generation_args)
-    print(f"[DEBUG] construct_message - LLM Output: {output}")
+    print(f"[DEBUG] Summarization Output: {output}")
 
     completion = output[0]["generated_text"]
 
@@ -59,7 +59,6 @@ def construct_message(agent_context, instruction, idx):
         + instruction
     )
 
-    print(f"[DEBUG] construct_message - Output prefix_string: {prefix_string}")
     return prefix_string
 
 
@@ -77,11 +76,7 @@ def summarize_message(agent_contexts, instruction, idx):
         + "\n\n Write a summary of the different opinions from each of the individual agent."
     )
 
-    print(
-        f"[DEBUG] summarize_message - Calling construct_message with prefix_string: {prefix_string}"
-    )
     completion = construct_message(prefix_string, instruction, idx)
-    print(f"[DEBUG] summarize_message - Output completion: {completion}")
 
     return completion
 
@@ -109,9 +104,9 @@ if __name__ == "__main__":
 
     def generate_answer(model, formatted_prompt):
         input = [{"role": "user", "content": formatted_prompt}]
-        print(f"[DEBUG] generate_answer - LLM Input: {input}")
+        print(f"[DEBUG] LLM Input: {input}")
         output = pipe(input, **generation_args)
-        print(f"[DEBUG] generate_answer - LLM Output: {output}")
+        print(f"[DEBUG] LLM Output: {output}")
 
         generated_text = output[0]["generated_text"]
         return {"model": model, "content": generated_text}
@@ -163,7 +158,7 @@ if __name__ == "__main__":
                 )
                 agent_context.append(completion)
 
-        print(f"\n# Question No.{idx+1} debate is ended.")
+        print(f"\n[DEBUG] Question No.{idx+1} debate is ended.")
 
         models_response = {
             f"model_{i}": [
@@ -188,7 +183,7 @@ if __name__ == "__main__":
         with open(file_name, "w") as f:
             json.dump(generated_description, f, indent=4)
 
-        print(f"Results saved after question {idx+1}")
+        print(f"[DEBUG] Results saved after question {idx+1}")
 
-    print(f"The result file '{file_name}' is saved.")
+    print(f"[DEBUG] The result file '{file_name}' is saved.")
     print("All done!!")
