@@ -91,7 +91,9 @@ if __name__ == "__main__":
             gt = response_dict[idx]["answer"]
             print(f"Question: {questions[idx]}")
             print(f"Ground Truth: {gt}")
-            print(f"Responses: {responses}")
+            print("Responses:")
+            for i, response in enumerate(responses):
+                print(f"Response {i+1}: {response}")
             accurate = compute_accuracy(gt, responses)
 
             if accurate is not None:
