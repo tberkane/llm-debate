@@ -66,13 +66,13 @@ def summarize_message(agent_contexts, instruction, idx):
 
     for agent in agent_contexts:
         agent_response = agent[-1]["content"]
-        response = "\n\n One agent response: ```{}```".format(agent_response)
+        response = f"\n\n Response from agent {idx}: ```{agent_response}```"
 
         prefix_string = prefix_string + response
 
     prefix_string = (
         prefix_string
-        + "\n\n Write a summary of the different opinions from each of the individual agent."
+        + "\n\n Write an impartial summary of the different opinions from each of the individual agent."
     )
 
     completion = construct_message(prefix_string, instruction, idx)
