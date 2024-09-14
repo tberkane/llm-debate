@@ -142,7 +142,7 @@ if __name__ == "__main__":
     questions = read_jsonl("gsm8k_test.jsonl")
     random.shuffle(questions)
 
-    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval.json"
+    file_name = f"gsm_result_{agents}agents_{rounds}turns_{evaluation}eval_{llm}.json"
 
     for idx in tqdm(range(evaluation)):
         question = questions[idx]["question"]

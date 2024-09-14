@@ -10,7 +10,7 @@ def args_parse():
     parser.add_argument("--turns", default=2, type=int)
     parser.add_argument("--num-agents", default=2, type=int)
     parser.add_argument("--evaluation", default="100", type=str)
-
+    parser.add_argument("--llm", default="gpt2", type=str)
     return parser.parse_args()
 
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     args = args_parse()
     num_agents = args.num_agents
     turns = args.turns
-    file_name = f"{num_agents}agents_{turns}turns_{args.evaluation}eval.json"
+    file_name = f"{num_agents}agents_{turns}turns_{args.evaluation}eval_{args.llm}.json"
 
     with open(f"gsm_result_{file_name}", "r") as f:
         response_dict = json.load(f)
