@@ -42,7 +42,7 @@ def generate_text(pipe, input_text, generation_args, debug=False):
 def format_prompt(question, instruction, previous_responses=None):
     prompt = f"""Question: {question}
 
-Your task is to solve this math problem, provide a final answer in the format: \\boxed{{your_numerical_answer_here}}, ensure that the boxed answer is the last thing in your response.
+Your task is to solve this math problem, provide a final answer in the format: \\boxed{{your_numerical_answer_here}}, ensure that the boxed answer is the very last numerical value mentioned in your response.
 {instruction}
 """
     if previous_responses:
